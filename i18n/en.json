@@ -1,0 +1,80 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "back": "Back",
+    "next": "Next",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "noData": "No data found",
+    "confirm": "Confirm"
+  },
+  "auth": {
+    "login": "Sign In",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign In",
+    "noAccount": "Don't have an account?",
+    "register": "Register",
+    "verifyCode": "Verification Code",
+    "codeSent": "A 6-digit code was sent to your email.",
+    "verify": "Verify",
+    "company": "Company",
+    "companyTitle": "Title / Position",
+    "phone": "Phone",
+    "confirmPassword": "Confirm Password",
+    "completeReg": "Complete Registration",
+    "hasAccount": "Already have an account?",
+    "pendingTitle": "Waiting for Approval",
+    "pendingMsg": "Your account is pending admin approval.",
+    "logout": "Logout"
+  },
+  "nav": {
+    "home": "Home",
+    "projects": "Projects",
+    "products": "Products",
+    "notifications": "Notifications"
+  },
+  "projects": {
+    "title": "My Projects",
+    "new": "New Project",
+    "name": "Project Name",
+    "description": "Description",
+    "customerName": "Customer Name",
+    "customerCountry": "Customer Country",
+    "products": "products",
+    "confirmDelete": "Delete this project?",
+    "deleteText": "All products in this project will also be removed.",
+    "toastCreated": "Project created",
+    "toastUpdated": "Project updated",
+    "toastDeleted": "Project deleted"
+  },
+  "products": {
+    "title": "Products",
+    "search": "Search products...",
+    "new": "New Product",
+    "confirmDelete": "Delete this product?",
+    "toastDeleted": "Product deleted",
+    "copiedFrom": "Copied from: {{project}}",
+    "steps": {
+      "machine": "Machine",
+      "info": "Product Info",
+      "flavor": "Flavor",
+      "filling": "Filling",
+      "chocolate": "Chocolate",
+      "dimensions": "Dimensions",
+      "stick": "Stick",
+      "eol": "EOL",
+      "images": "Images"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark All Read",
+    "noNotifications": "No notifications",
+    "toastMarked": "All marked as read"
+  }
+}

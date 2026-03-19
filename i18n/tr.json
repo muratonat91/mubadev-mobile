@@ -1,0 +1,80 @@
+{
+  "common": {
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "delete": "Sil",
+    "edit": "Düzenle",
+    "add": "Ekle",
+    "back": "Geri",
+    "next": "İleri",
+    "loading": "Yükleniyor...",
+    "error": "Bir hata oluştu",
+    "noData": "Veri bulunamadı",
+    "confirm": "Onayla"
+  },
+  "auth": {
+    "login": "Giriş Yap",
+    "email": "E-posta",
+    "password": "Şifre",
+    "signIn": "Giriş Yap",
+    "noAccount": "Hesabınız yok mu?",
+    "register": "Kayıt Ol",
+    "verifyCode": "Doğrulama Kodu",
+    "codeSent": "E-posta adresinize 6 haneli kod gönderildi.",
+    "verify": "Doğrula",
+    "company": "Şirket",
+    "companyTitle": "Ünvan / Pozisyon",
+    "phone": "Telefon",
+    "confirmPassword": "Şifre Tekrar",
+    "completeReg": "Kaydı Tamamla",
+    "hasAccount": "Zaten hesabınız var mı?",
+    "pendingTitle": "Onay Bekleniyor",
+    "pendingMsg": "Hesabınız admin onayı bekliyor.",
+    "logout": "Çıkış"
+  },
+  "nav": {
+    "home": "Anasayfa",
+    "projects": "Projeler",
+    "products": "Ürünler",
+    "notifications": "Bildirimler"
+  },
+  "projects": {
+    "title": "Projelerim",
+    "new": "Yeni Proje",
+    "name": "Proje Adı",
+    "description": "Açıklama",
+    "customerName": "Müşteri Adı",
+    "customerCountry": "Müşteri Ülkesi",
+    "products": "ürün",
+    "confirmDelete": "Bu projeyi sil?",
+    "deleteText": "Projedeki tüm ürünler de silinecek.",
+    "toastCreated": "Proje oluşturuldu",
+    "toastUpdated": "Proje güncellendi",
+    "toastDeleted": "Proje silindi"
+  },
+  "products": {
+    "title": "Ürünler",
+    "search": "Ürün ara...",
+    "new": "Yeni Ürün",
+    "confirmDelete": "Bu ürünü sil?",
+    "toastDeleted": "Ürün silindi",
+    "copiedFrom": "Kopyalandı: {{project}}",
+    "steps": {
+      "machine": "Makine",
+      "info": "Ürün Bilgisi",
+      "flavor": "Lezzet",
+      "filling": "Dolgu",
+      "chocolate": "Çikolata",
+      "dimensions": "Boyutlar",
+      "stick": "Çubuk",
+      "eol": "EOL",
+      "images": "Görseller"
+    }
+  },
+  "notifications": {
+    "title": "Bildirimler",
+    "markAllRead": "Tümünü Okundu İşaretle",
+    "noNotifications": "Bildirim yok",
+    "toastMarked": "Tümü okundu olarak işaretlendi"
+  }
+}
