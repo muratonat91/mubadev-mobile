@@ -60,6 +60,9 @@ export default function LoginScreen() {
             secureTextEntry
           />
           <AppButton title={t('auth.signIn')} onPress={handleLogin} loading={loading} />
+          <TouchableOpacity style={styles.forgotLink} onPress={() => router.push('/(auth)/forgot-password')}>
+            <Text style={styles.forgotText}>{t('auth.forgotPassword')}</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.link} onPress={() => router.push('/(auth)/register')}>
@@ -79,4 +82,6 @@ const styles = StyleSheet.create({
   link: { alignItems: 'center' },
   linkText: { fontSize: fontSize.sm, color: colors.gray500 },
   linkBold: { color: colors.primary, fontWeight: '600' },
+  forgotLink: { alignItems: 'center' },
+  forgotText: { fontSize: fontSize.sm, color: colors.primary },
 });

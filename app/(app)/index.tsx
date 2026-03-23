@@ -2,6 +2,8 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import i18n from '../../i18n/config';
 import { useAuthStore } from '../../store/auth';
 import { colors, spacing, fontSize, radius } from '../../theme';
 
@@ -15,13 +17,27 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const { user, logout } = useAuthStore();
   const router = useRouter();
+  const currentLang = i18n.language;
+
+  const toggleLanguage = async () => {
+    const newLang = currentLang === 'en' ? 'tr' : 'en';
+    await i18n.changeLanguage(newLang);
+    await AsyncStorage.setItem('app_language', newLang);
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.appName}>ProjectConfigurator</Text>
-          <Text style={styles.greeting}>👋 {user?.email}</Text>
+          <View style={styles.headerLeft}>
+            <Text style={styles.appName}>ProjectConfigurator</Text>
+            <Text style={styles.greeting}>
+              {user?.first_name ? `👋 ${user.first_name}` : `👋 ${user?.email}`}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.langBtn} onPress={toggleLanguage}>
+            <Text style={styles.langBtnText}>{currentLang === 'en' ? 'TR' : 'EN'}</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.grid}>
@@ -49,9 +65,22 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.gray50 },
   container: { padding: spacing.lg, gap: spacing.xl },
-  header: { gap: spacing.xs },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  headerLeft: { gap: spacing.xs, flex: 1 },
   appName: { fontSize: fontSize.xl, fontWeight: '700', color: colors.primary },
   greeting: { fontSize: fontSize.base, color: colors.gray500 },
+  langBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: radius.md,
+    marginTop: 2,
+  },
+  langBtnText: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
   grid: { gap: spacing.md },
   card: {
     borderRadius: radius.lg,

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Switch,
+  Image, FlatList, ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { useTranslation } from 'react-i18next';
-import { ProductsApi, type ProductPayload } from '../../api/products.api';
+import * as ImagePicker from 'expo-image-picker';
+import { ProductsApi, type ProductPayload, type ProductImageDto } from '../../api/products.api';
 import { ProjectsApi, type ProjectDto } from '../../api/projects.api';
 import { AppButton } from '../../components/ui/AppButton';
 import { AppInput } from '../../components/ui/AppInput';
@@ -19,8 +21,14 @@ import {
 } from '../../constants/productConstants';
 
 // ─── Step titles ──────────────────────────────────────────────────────────────
-const STEP_KEYS = ['machine', 'info', 'flavor', 'filling', 'chocolate', 'dimensions', 'stick', 'eol'] as const;
+const STEP_KEYS = ['machine', 'info', 'flavor', 'filling', 'chocolate', 'dimensions', 'stick', 'eol', 'images'] as const;
 type StepKey = (typeof STEP_KEYS)[number];
+
+interface LocalImage {
+  uri: string;
+  isPrimary: boolean;
+  existingId?: number; // if already uploaded
+}
 
 type FormState = {
   project_id: string;
@@ -81,6 +89,11 @@ export default function ProductFormScreen() {
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   const isEdit = !!params.id;
 
+  // Images state
+  const [images, setImages] = useState<LocalImage[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
+
   // Derived
   const machines = form.machine_type ? (MACHINE_MAP[form.machine_type] ?? []) : [];
   const productTypes = form.machine ? (PRODUCT_TYPE_MAP[form.machine] ?? []) : [];
@@ -88,8 +101,8 @@ export default function ProductFormScreen() {
   const isCone = CONE_PRODUCT_TYPES.includes(form.product_type);
 
   const steps: StepKey[] = isStick
-    ? ['machine', 'info', 'flavor', 'filling', 'chocolate', 'dimensions', 'stick', 'eol']
-    : ['machine', 'info', 'flavor', 'filling', 'chocolate', 'dimensions', 'eol'];
+    ? ['machine', 'info', 'flavor', 'filling', 'chocolate', 'dimensions', 'stick', 'eol', 'images']
+    : ['machine', 'info', 'flavor', 'filling', 'chocolate', 'dimensions', 'eol', 'images'];
 
   useEffect(() => { void ProjectsApi.list().then(setProjects); }, []);
 
@@ -116,6 +129,13 @@ export default function ProductFormScreen() {
           is_eol_inc: Boolean(r.is_eol_inc),
           how_many_pack_pattern: String(r.how_many_pack_pattern ?? '1'),
         }));
+        // Load existing images
+        const existingImages = (r.images as ProductImageDto[] | undefined) ?? [];
+        setImages(existingImages.map(img => ({
+          uri: img.image_url,
+          isPrimary: img.is_primary,
+          existingId: img.id,
+        })));
       });
     }
   }, [isEdit, params.id]);
@@ -123,14 +143,56 @@ export default function ProductFormScreen() {
   const set = (key: keyof FormState, val: unknown) =>
     setForm(prev => ({ ...prev, [key]: val }));
 
+  const pickImages = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      const newImages: LocalImage[] = result.assets.map(asset => ({
+        uri: asset.uri,
+        isPrimary: false,
+      }));
+      setImages(prev => {
+        const combined = [...prev, ...newImages];
+        // If no primary set, make first one primary
+        if (!combined.some(img => img.isPrimary) && combined.length > 0) {
+          combined[0].isPrimary = true;
+        }
+        return combined;
+      });
+    }
+  };
+
+  const setPrimary = (index: number) => {
+    setImages(prev => prev.map((img, i) => ({ ...img, isPrimary: i === index })));
+  };
+
+  const removeImage = async (index: number) => {
+    const img = images[index];
+    if (img.existingId && isEdit) {
+      setDeletingImageId(img.existingId);
+      try {
+        await ProductsApi.deleteImage(Number(params.id), img.existingId);
+        setImages(prev => prev.filter((_, i) => i !== index));
+        Toast.show({ type: 'success', text1: t('products.imageDeleted') });
+      } catch {
+        Toast.show({ type: 'error', text1: t('common.error') });
+      } finally {
+        setDeletingImageId(null);
+      }
+    } else {
+      setImages(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
   const handleSave = async () => {
     if (!form.project_id || !form.machine_type || !form.machine || !form.product_type || !form.product_name) {
       Alert.alert(t('common.error'), 'Please fill all required fields');
       return;
     }
 
-    // Find machine_type_id and machine_id by name — in a real app these IDs come from backend
-    // Here we use index-based mapping (same as web seeder order)
     const machineTypeNames = MACHINE_TYPES;
     const machineTypeId = machineTypeNames.indexOf(form.machine_type) + 1;
     const machineId = (MACHINE_MAP[form.machine_type] ?? []).indexOf(form.machine) + 1;
@@ -173,18 +235,37 @@ export default function ProductFormScreen() {
 
     setSaving(true);
     try {
+      let productId: number;
       if (isEdit) {
         await ProductsApi.update(Number(params.id), payload);
-        Toast.show({ type: 'success', text1: 'Product updated' });
+        productId = Number(params.id);
+        Toast.show({ type: 'success', text1: t('products.toastUpdated') });
       } else {
-        await ProductsApi.create(payload);
-        Toast.show({ type: 'success', text1: 'Product created' });
+        const created = await ProductsApi.create(payload);
+        productId = created.id;
+        Toast.show({ type: 'success', text1: t('products.toastCreated') });
       }
+
+      // Upload new images (those without existingId)
+      const newImages = images.filter(img => !img.existingId);
+      if (newImages.length > 0) {
+        setUploadingImages(true);
+        for (const img of newImages) {
+          try {
+            await ProductsApi.uploadImage(productId, img.uri, img.isPrimary);
+          } catch {
+            // Continue uploading other images even if one fails
+          }
+        }
+        setUploadingImages(false);
+      }
+
       router.back();
     } catch {
       Toast.show({ type: 'error', text1: t('common.error') });
     } finally {
       setSaving(false);
+      setUploadingImages(false);
     }
   };
 
@@ -246,7 +327,7 @@ export default function ProductFormScreen() {
               <AppPicker
                 label="Product Type *"
                 value={form.product_type}
-                options={productTypes.map(t => ({ label: t, value: t }))}
+                options={productTypes.map(pt => ({ label: pt, value: pt }))}
                 onChange={v => set('product_type', v)}
               />
             ) : null}
@@ -333,6 +414,61 @@ export default function ProductFormScreen() {
             <AppInput label="Pack Patterns" value={form.how_many_pack_pattern} onChangeText={v => set('how_many_pack_pattern', v)} keyboardType="numeric" />
           </View>
         )}
+
+        {currentStep === 'images' && (
+          <View style={styles.fields}>
+            <Text style={styles.imageHint}>{t('products.imageHint')}</Text>
+
+            {/* Image grid */}
+            {images.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageScroll}>
+                {images.map((img, index) => (
+                  <View key={img.existingId ?? img.uri} style={styles.imageThumbnailContainer}>
+                    <TouchableOpacity onPress={() => setPrimary(index)} activeOpacity={0.8}>
+                      <Image source={{ uri: img.uri }} style={styles.imageThumbnail} />
+                      {img.isPrimary ? (
+                        <View style={styles.primaryBadge}>
+                          <Text style={styles.primaryBadgeText}>{t('products.primary')}</Text>
+                        </View>
+                      ) : null}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.removeImageBtn}
+                      onPress={() => removeImage(index)}
+                      disabled={deletingImageId === img.existingId}
+                    >
+                      {deletingImageId === img.existingId ? (
+                        <ActivityIndicator size="small" color={colors.white} />
+                      ) : (
+                        <Text style={styles.removeImageBtnText}>✕</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : null}
+
+            <AppButton
+              title={t('products.pickImages')}
+              onPress={pickImages}
+              variant="secondary"
+            />
+
+            {images.length > 0 ? (
+              <Text style={styles.imageCount}>
+                {t('products.imageCount', { count: images.length })}
+                {' · '}{t('products.tapToPrimary')}
+              </Text>
+            ) : null}
+
+            {uploadingImages ? (
+              <View style={styles.uploadingRow}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.uploadingText}>{t('products.uploading')}</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
       </ScrollView>
 
       {/* Navigation */}
@@ -341,7 +477,7 @@ export default function ProductFormScreen() {
           <AppButton title={t('common.back')} onPress={() => setStep(s => s - 1)} variant="secondary" style={styles.navBtn} />
         )}
         {isLast ? (
-          <AppButton title={t('common.save')} onPress={handleSave} loading={saving} style={[styles.navBtn, { flex: 1 }]} />
+          <AppButton title={t('common.save')} onPress={handleSave} loading={saving || uploadingImages} style={[styles.navBtn, { flex: 1 }]} />
         ) : (
           <AppButton title={t('common.next')} onPress={() => setStep(s => s + 1)} style={[styles.navBtn, { flex: 1 }]} />
         )}
@@ -380,4 +516,41 @@ const styles = StyleSheet.create({
   fields: { gap: spacing.md },
   navBar: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray200, backgroundColor: colors.white },
   navBtn: { minWidth: 100 },
+  // Images step
+  imageHint: { fontSize: fontSize.sm, color: colors.gray500, lineHeight: 20 },
+  imageScroll: { gap: spacing.sm, paddingVertical: spacing.sm },
+  imageThumbnailContainer: { position: 'relative', marginRight: spacing.sm },
+  imageThumbnail: {
+    width: 100,
+    height: 100,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: colors.gray200,
+  },
+  primaryBadge: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    right: 4,
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingVertical: 2,
+    alignItems: 'center',
+  },
+  primaryBadgeText: { color: colors.white, fontSize: fontSize.xs, fontWeight: '700' },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImageBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  imageCount: { fontSize: fontSize.xs, color: colors.gray500, textAlign: 'center' },
+  uploadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, justifyContent: 'center' },
+  uploadingText: { fontSize: fontSize.sm, color: colors.primary },
 });

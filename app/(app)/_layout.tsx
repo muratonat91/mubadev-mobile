@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { Text } from 'react-native';
 import { colors } from '../../theme';
 
 export default function AppLayout() {
@@ -30,11 +31,19 @@ export default function AppLayout() {
         name="notifications"
         options={{ title: t('nav.notifications'), tabBarIcon: ({ color }) => <TabIcon emoji="🔔" color={color} /> }}
       />
+      <Tabs.Screen
+        name="profile"
+        options={{ title: t('nav.profile'), tabBarIcon: ({ color }) => <TabIcon emoji="👤" color={color} /> }}
+      />
+      {/* Hidden screens — not shown in tabs */}
+      <Tabs.Screen
+        name="product-form"
+        options={{ href: null }}
+      />
     </Tabs>
   );
 }
 
 function TabIcon({ emoji, color }: { emoji: string; color: string }) {
-  const { Text } = require('react-native');
   return <Text style={{ fontSize: 20, color }}>{emoji}</Text>;
 }
