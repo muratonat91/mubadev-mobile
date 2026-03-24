@@ -1,8 +1,8 @@
 import api from './axios';
 
 export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
+  access_token: string;
+  refresh_token: string;
 }
 
 export interface UserDto {

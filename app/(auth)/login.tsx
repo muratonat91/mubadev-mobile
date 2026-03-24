@@ -22,8 +22,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const tokens = await AuthApi.login(email.trim(), password);
-      await AsyncStorage.setItem('access_token', tokens.accessToken);
-      await AsyncStorage.setItem('refresh_token', tokens.refreshToken);
+      await AsyncStorage.setItem('access_token', tokens.access_token);
+      await AsyncStorage.setItem('refresh_token', tokens.refresh_token);
       const me = await AuthApi.me();
       setUser(me);
       if (me.status === 'pending_approval') {
