@@ -2,226 +2,229 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, RefreshControl, Modal, ScrollView,
-  ActivityIndicator, Image,
+  ActivityIndicator, Image, StatusBar,
 } from 'react-native';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL?.replace('/api', '') ?? 'https://icematrix.site';
-const toImageUrl = (path: string) => path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { useTranslation } from 'react-i18next';
 import { ProductsApi, type ProductDto } from '../../api/products.api';
 import { ProjectsApi, type ProjectDto } from '../../api/projects.api';
-import { AppButton } from '../../components/ui/AppButton';
 import { colors, spacing, fontSize, radius } from '../../theme';
 
-// ─── Product Detail Modal ──────────────────────────────────────────────────────
+const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'https://icematrix.site/api').replace('/api', '');
+const toImageUrl = (path: string) => path?.startsWith('http') ? path : `${API_BASE}${path}`;
 
-function DetailRow({ label, value }: { label: string; value: unknown }) {
-  let display: React.ReactNode;
-
-  if (value === null || value === undefined || value === '') {
-    display = <Text style={detailStyles.valueMuted}>—</Text>;
-  } else if (typeof value === 'boolean') {
-    display = (
-      <Text style={[detailStyles.valueBadge, value ? detailStyles.yes : detailStyles.no]}>
-        {value ? 'Yes' : 'No'}
-      </Text>
-    );
-  } else {
-    display = <Text style={detailStyles.value}>{String(value)}</Text>;
-  }
-
+// ─── Detail Modal ──────────────────────────────────────────────────────────────
+function SpecRow({ label, value }: { label: string; value: unknown }) {
+  if (value === null || value === undefined || value === '') return null;
+  const isBoolean = typeof value === 'boolean';
   return (
-    <View style={detailStyles.row}>
-      <Text style={detailStyles.label}>{label}</Text>
-      {display}
+    <View style={detailS.row}>
+      <Text style={detailS.label}>{label}</Text>
+      {isBoolean ? (
+        <View style={[detailS.badge, value ? detailS.yes : detailS.no]}>
+          <Text style={[detailS.badgeText, { color: value ? colors.success : colors.danger }]}>{value ? '✓ Yes' : '✗ No'}</Text>
+        </View>
+      ) : (
+        <Text style={detailS.value}>{String(value)}</Text>
+      )}
     </View>
   );
 }
 
-const detailStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
-  },
-  label: { fontSize: fontSize.sm, color: colors.gray500, flex: 1, marginRight: spacing.sm },
-  value: { fontSize: fontSize.sm, color: colors.gray900, fontWeight: '500', flex: 1, textAlign: 'right' },
-  valueMuted: { fontSize: fontSize.sm, color: colors.gray300, flex: 1, textAlign: 'right' },
-  valueBadge: { fontSize: fontSize.xs, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.full },
-  yes: { backgroundColor: '#dcfce7', color: '#15803d' },
-  no: { backgroundColor: '#fee2e2', color: '#dc2626' },
-});
-
 function ProductDetailModal({ product, onClose }: { product: ProductDto; onClose: () => void }) {
   const { t } = useTranslation();
+  const images = product.images ?? [];
 
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
-        <View style={modalStyles.header}>
-          <Text style={modalStyles.title} numberOfLines={2}>{product.product_name}</Text>
-          <TouchableOpacity onPress={onClose} style={modalStyles.closeBtn}>
-            <Text style={modalStyles.closeBtnText}>✕</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <StatusBar barStyle="light-content" />
+        {/* Header */}
+        <View style={detailS.header}>
+          <TouchableOpacity onPress={onClose} style={detailS.closeBtn}>
+            <Text style={detailS.closeBtnText}>←</Text>
           </TouchableOpacity>
+          <Text style={detailS.title} numberOfLines={2}>{product.product_name}</Text>
         </View>
 
-        <ScrollView contentContainerStyle={modalStyles.content}>
-          <Text style={modalStyles.sectionTitle}>{t('products.steps.machine')}</Text>
-          <DetailRow label={t('products.fields.machineType')} value={product.machine_type_name} />
-          <DetailRow label={t('products.fields.machine')} value={product.machine_name} />
-          <DetailRow label={t('products.fields.project')} value={product.project_name} />
+        <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }} showsVerticalScrollIndicator={false}>
+          {/* Images */}
+          {images.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+              {images.map((img, i) => (
+                <Image
+                  key={i}
+                  source={{ uri: toImageUrl(img.image_url) }}
+                  style={detailS.image}
+                  resizeMode="cover"
+                />
+              ))}
+            </ScrollView>
+          )}
 
-          <Text style={[modalStyles.sectionTitle, { marginTop: spacing.md }]}>{t('products.steps.info')}</Text>
-          <DetailRow label={t('products.fields.productType')} value={product.product_type} />
-          <DetailRow label={t('products.fields.capacity')} value={product.capacity} />
-          <DetailRow label={t('products.fields.toBeCommissioned')} value={product.to_be_commissioned} />
+          {/* Capacity hero */}
+          <View style={detailS.heroCard}>
+            <Text style={detailS.heroLabel}>Capacity</Text>
+            <Text style={detailS.heroValue}>{product.capacity?.toLocaleString()}</Text>
+            <Text style={detailS.heroUnit}>pcs / hr</Text>
+          </View>
 
-          <Text style={[modalStyles.sectionTitle, { marginTop: spacing.md }]}>{t('products.steps.flavor')}</Text>
-          <DetailRow label={t('products.fields.noOfFlavor')} value={product.no_of_flavor} />
-          <DetailRow label={t('products.fields.totalVolume')} value={product.total_volume} />
-          <DetailRow label={t('products.fields.inclusionInIceCream')} value={product.inclusion_in_ice_cream} />
-          <DetailRow label={t('products.fields.rippleSauce')} value={product.ripple_sauce} />
-          <DetailRow label={t('products.fields.noOfRippleSauce')} value={product.no_of_ripple_sauce} />
+          {/* Specs */}
+          <View style={detailS.section}>
+            <Text style={detailS.sectionTitle}>{t('products.steps.machine')}</Text>
+            <SpecRow label={t('products.fields.machineType')} value={product.machine_type_name} />
+            <SpecRow label={t('products.fields.machine')} value={product.machine_name} />
+            <SpecRow label={t('products.fields.project')} value={product.project_name} />
+          </View>
 
-          <Text style={[modalStyles.sectionTitle, { marginTop: spacing.md }]}>{t('products.steps.filling')}</Text>
-          <DetailRow label={t('products.fields.fillingPattern')} value={product.filling_pattern} />
-          <DetailRow label={t('products.fields.liquidSauceTopping')} value={product.liquid_sauce_topping} />
-          <DetailRow label={t('products.fields.liquidSauceToppingType')} value={product.liquid_sauce_topping_type} />
-          <DetailRow label={t('products.fields.dryTopping')} value={product.dry_topping} />
-          <DetailRow label={t('products.fields.dryToppingTypeSize')} value={product.dry_topping_type_size} />
+          <View style={detailS.section}>
+            <Text style={detailS.sectionTitle}>{t('products.steps.info')}</Text>
+            <SpecRow label={t('products.fields.productType')} value={product.product_type} />
+            <SpecRow label={t('products.fields.toBeCommissioned')} value={product.to_be_commissioned} />
+          </View>
 
-          <Text style={[modalStyles.sectionTitle, { marginTop: spacing.md }]}>{t('products.steps.chocolate')}</Text>
-          <DetailRow label={t('products.fields.chocolateCoating')} value={product.chocolate_coating} />
-          <DetailRow label={t('products.fields.chocolateCoatingType')} value={product.chocolate_coating_type} />
-          <DetailRow label={t('products.fields.coatingSequence')} value={product.coating_sequence} />
-          <DetailRow label={t('products.fields.dryStuffInChocolate')} value={product.dry_stuff_in_chocolate} />
-          <DetailRow label={t('products.fields.dryStuffType')} value={product.dry_stuff_type} />
+          <View style={detailS.section}>
+            <Text style={detailS.sectionTitle}>{t('products.steps.flavor')}</Text>
+            <SpecRow label={t('products.fields.noOfFlavor')} value={product.no_of_flavor} />
+            <SpecRow label={t('products.fields.totalVolume')} value={product.total_volume} />
+            <SpecRow label={t('products.fields.inclusionInIceCream')} value={product.inclusion_in_ice_cream} />
+            <SpecRow label={t('products.fields.rippleSauce')} value={product.ripple_sauce} />
+            <SpecRow label={t('products.fields.noOfRippleSauce')} value={product.no_of_ripple_sauce} />
+          </View>
 
-          <Text style={[modalStyles.sectionTitle, { marginTop: spacing.md }]}>{t('products.steps.dimensions')}</Text>
-          <DetailRow label={t('products.fields.lengthL1')} value={product.product_length_l1} />
-          <DetailRow label={t('products.fields.lengthL2')} value={product.product_length_l2} />
-          <DetailRow label={t('products.fields.widthW')} value={product.product_width_w} />
-          <DetailRow label={t('products.fields.thicknessH')} value={product.product_thickness_h} />
-          <DetailRow label={t('products.fields.diameter')} value={product.product_diameter} />
-          <DetailRow label={t('products.fields.coneDegree')} value={product.cone_degree} />
+          <View style={detailS.section}>
+            <Text style={detailS.sectionTitle}>{t('products.steps.filling')}</Text>
+            <SpecRow label={t('products.fields.fillingPattern')} value={product.filling_pattern} />
+            <SpecRow label={t('products.fields.liquidSauceTopping')} value={product.liquid_sauce_topping} />
+            <SpecRow label={t('products.fields.dryTopping')} value={product.dry_topping} />
+          </View>
 
-          <Text style={[modalStyles.sectionTitle, { marginTop: spacing.md }]}>{t('products.steps.stick')}</Text>
-          <DetailRow label={t('products.fields.stickType')} value={product.stick_type} />
-          <DetailRow label={t('products.fields.stickLength')} value={product.stick_length} />
-          <DetailRow label={t('products.fields.stickWidth')} value={product.stick_width} />
+          <View style={detailS.section}>
+            <Text style={detailS.sectionTitle}>{t('products.steps.chocolate')}</Text>
+            <SpecRow label={t('products.fields.chocolateCoating')} value={product.chocolate_coating} />
+            <SpecRow label={t('products.fields.chocolateCoatingType')} value={product.chocolate_coating_type} />
+            <SpecRow label={t('products.fields.coatingSequence')} value={product.coating_sequence} />
+            <SpecRow label={t('products.fields.dryStuffInChocolate')} value={product.dry_stuff_in_chocolate} />
+          </View>
 
-          <Text style={[modalStyles.sectionTitle, { marginTop: spacing.md }]}>{t('products.steps.eol')}</Text>
-          <DetailRow label={t('products.fields.isEolInc')} value={product.is_eol_inc} />
-          <DetailRow label={t('products.fields.howManyPackPattern')} value={product.how_many_pack_pattern} />
+          <View style={detailS.section}>
+            <Text style={detailS.sectionTitle}>{t('products.steps.dimensions')}</Text>
+            <SpecRow label={t('products.fields.lengthL1')} value={product.product_length_l1 ? `${product.product_length_l1} mm` : null} />
+            <SpecRow label={t('products.fields.lengthL2')} value={product.product_length_l2 ? `${product.product_length_l2} mm` : null} />
+            <SpecRow label={t('products.fields.widthW')} value={product.product_width_w ? `${product.product_width_w} mm` : null} />
+            <SpecRow label={t('products.fields.thicknessH')} value={product.product_thickness_h ? `${product.product_thickness_h} mm` : null} />
+            <SpecRow label={t('products.fields.diameter')} value={product.product_diameter ? `${product.product_diameter} mm` : null} />
+          </View>
 
-          {product.copied_from_project_name ? (
-            <>
-              <Text style={[modalStyles.sectionTitle, { marginTop: spacing.md }]}>{t('products.copyInfo')}</Text>
-              <DetailRow label={t('products.copiedFrom', { project: '' })} value={product.copied_from_project_name} />
-            </>
-          ) : null}
+          {(product.stick_type || product.stick_length) && (
+            <View style={detailS.section}>
+              <Text style={detailS.sectionTitle}>{t('products.steps.stick')}</Text>
+              <SpecRow label={t('products.fields.stickType')} value={product.stick_type} />
+              <SpecRow label={t('products.fields.stickLength')} value={product.stick_length ? `${product.stick_length} mm` : null} />
+              <SpecRow label={t('products.fields.stickWidth')} value={product.stick_width ? `${product.stick_width} mm` : null} />
+            </View>
+          )}
+
+          <View style={[detailS.section, { marginBottom: 40 }]}>
+            <Text style={detailS.sectionTitle}>{t('products.steps.eol')}</Text>
+            <SpecRow label={t('products.fields.isEolInc')} value={product.is_eol_inc} />
+            <SpecRow label={t('products.fields.howManyPackPattern')} value={product.how_many_pack_pattern} />
+          </View>
         </ScrollView>
       </SafeAreaView>
     </Modal>
   );
 }
 
-const modalStyles = StyleSheet.create({
+const detailS = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.lg,
+    gap: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
-    gap: spacing.sm,
+    borderBottomColor: colors.border,
   },
-  title: { flex: 1, fontSize: fontSize.lg, fontWeight: '700', color: colors.gray900 },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.gray100,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 36, height: 36, borderRadius: radius.md,
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
   },
-  closeBtnText: { fontSize: fontSize.base, color: colors.gray600, fontWeight: '700' },
-  content: { padding: spacing.lg, paddingBottom: spacing.xl },
-  sectionTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  closeBtnText: { fontSize: fontSize.lg, color: colors.accent, fontWeight: '700' },
+  title: { flex: 1, fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+  image: { width: 200, height: 140, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
+  heroCard: {
+    backgroundColor: colors.surface2, borderRadius: radius.lg, padding: spacing.lg,
+    alignItems: 'center', borderWidth: 1, borderColor: colors.borderAccent,
+  },
+  heroLabel: { fontSize: fontSize.xs, color: colors.muted, letterSpacing: 1, textTransform: 'uppercase' },
+  heroValue: { fontSize: 36, fontWeight: '800', color: colors.accent, marginVertical: 4 },
+  heroUnit: { fontSize: fontSize.sm, color: colors.subtext },
+  section: {
+    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
+    gap: 2, borderWidth: 1, borderColor: colors.border,
+  },
+  sectionTitle: {
+    fontSize: fontSize.xs, fontWeight: '700', color: colors.accent,
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing.sm,
+  },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border },
+  label: { fontSize: fontSize.sm, color: colors.subtext, flex: 1 },
+  value: { fontSize: fontSize.sm, color: colors.text, fontWeight: '500', textAlign: 'right' },
+  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.full, borderWidth: 1 },
+  yes: { backgroundColor: colors.successSoft, borderColor: colors.success + '40' },
+  no: { backgroundColor: colors.dangerSoft, borderColor: colors.danger + '40' },
+  badgeText: { fontSize: fontSize.xs, fontWeight: '700' },
 });
 
-// ─── Copy Product Modal ────────────────────────────────────────────────────────
-
-function CopyProductModal({
-  product,
-  projects,
-  onClose,
-  onSuccess,
-}: {
-  product: ProductDto;
-  projects: ProjectDto[];
-  onClose: () => void;
-  onSuccess: () => void;
+// ─── Copy Modal ────────────────────────────────────────────────────────────────
+function CopyProductModal({ product, projects, onClose, onSuccess }: {
+  product: ProductDto; projects: ProjectDto[];
+  onClose: () => void; onSuccess: () => void;
 }) {
   const { t } = useTranslation();
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [copying, setCopying] = useState(false);
 
   const handleCopy = async () => {
-    if (!selectedProjectId) {
-      Alert.alert(t('common.error'), t('products.selectProject'));
-      return;
-    }
+    if (!selectedId) { Alert.alert(t('common.error'), t('products.selectProject')); return; }
     setCopying(true);
     try {
-      await ProductsApi.copy(product.id, selectedProjectId);
+      await ProductsApi.copy(product.id, selectedId);
       Toast.show({ type: 'success', text1: t('products.toastCopied') });
-      onSuccess();
-      onClose();
+      onSuccess(); onClose();
     } catch {
       Toast.show({ type: 'error', text1: t('common.error') });
-    } finally {
-      setCopying(false);
-    }
+    } finally { setCopying(false); }
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={copyStyles.overlay}>
-        <View style={copyStyles.sheet}>
-          <Text style={copyStyles.title}>{t('products.copyTo')}</Text>
-          <Text style={copyStyles.subtitle}>{product.product_name}</Text>
-
-          <ScrollView style={copyStyles.list} showsVerticalScrollIndicator={false}>
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={copyS.overlay}>
+        <View style={copyS.sheet}>
+          <Text style={copyS.title}>{t('products.copyTo')}</Text>
+          <Text style={copyS.subtitle}>{product.product_name}</Text>
+          <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
             {projects.map(p => (
               <TouchableOpacity
                 key={p.id}
-                style={[copyStyles.projectItem, selectedProjectId === p.id && copyStyles.projectItemSelected]}
-                onPress={() => setSelectedProjectId(p.id)}
+                style={[copyS.item, selectedId === p.id && copyS.itemSelected]}
+                onPress={() => setSelectedId(p.id)}
               >
-                <Text style={[copyStyles.projectName, selectedProjectId === p.id && copyStyles.projectNameSelected]}>
-                  {p.project_name}
-                </Text>
-                {p.customer_name ? (
-                  <Text style={copyStyles.projectSub}>{p.customer_name}</Text>
-                ) : null}
+                <Text style={[copyS.itemName, selectedId === p.id && { color: colors.accent }]}>{p.project_name}</Text>
+                {p.customer_name ? <Text style={copyS.itemSub}>{p.customer_name}</Text> : null}
               </TouchableOpacity>
             ))}
           </ScrollView>
-
-          <View style={copyStyles.actions}>
-            <AppButton title={t('common.cancel')} onPress={onClose} variant="ghost" style={{ flex: 1 }} />
-            <AppButton
-              title={t('products.copy')}
-              onPress={handleCopy}
-              loading={copying}
-              style={{ flex: 1 }}
-            />
+          <View style={copyS.actions}>
+            <TouchableOpacity style={copyS.cancelBtn} onPress={onClose}>
+              <Text style={copyS.cancelText}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={copyS.confirmBtn} onPress={handleCopy} disabled={copying}>
+              {copying ? <ActivityIndicator color={colors.text} size="small" /> : <Text style={copyS.confirmText}>{t('products.copy')}</Text>}
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -229,44 +232,23 @@ function CopyProductModal({
   );
 }
 
-const copyStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    padding: spacing.lg,
-    gap: spacing.md,
-    maxHeight: '70%',
-  },
-  title: { fontSize: fontSize.lg, fontWeight: '700', color: colors.gray900 },
-  subtitle: { fontSize: fontSize.sm, color: colors.gray500 },
-  list: { maxHeight: 300 },
-  projectItem: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    marginBottom: spacing.sm,
-    gap: 2,
-  },
-  projectItemSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  projectName: { fontSize: fontSize.base, color: colors.gray900, fontWeight: '600' },
-  projectNameSelected: { color: colors.primary },
-  projectSub: { fontSize: fontSize.sm, color: colors.gray500 },
+const copyS = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: colors.surface2, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.lg, gap: spacing.md, borderTopWidth: 1, borderColor: colors.border },
+  title: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+  subtitle: { fontSize: fontSize.sm, color: colors.subtext },
+  item: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm, gap: 2 },
+  itemSelected: { borderColor: colors.borderAccent, backgroundColor: colors.accentSoft },
+  itemName: { fontSize: fontSize.base, color: colors.text, fontWeight: '600' },
+  itemSub: { fontSize: fontSize.sm, color: colors.subtext },
   actions: { flexDirection: 'row', gap: spacing.md },
+  cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
+  cancelText: { color: colors.subtext, fontWeight: '600' },
+  confirmBtn: { flex: 1, paddingVertical: 12, borderRadius: radius.md, backgroundColor: colors.accentDark, alignItems: 'center' },
+  confirmText: { color: colors.text, fontWeight: '700' },
 });
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
-
 export default function ProductsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -278,12 +260,8 @@ export default function ProductsScreen() {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Detail modal
   const [detailProduct, setDetailProduct] = useState<ProductDto | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-
-  // Copy modal
   const [copyProduct, setCopyProduct] = useState<ProductDto | null>(null);
   const [allProjects, setAllProjects] = useState<ProjectDto[]>([]);
 
@@ -302,11 +280,7 @@ export default function ProductsScreen() {
   }, [projectId, search]);
 
   useEffect(() => { void fetchProducts(1, true); }, [fetchProducts]);
-
-  // Preload projects for copy modal
-  useEffect(() => {
-    void ProjectsApi.list().then(setAllProjects).catch(() => {});
-  }, []);
+  useEffect(() => { void ProjectsApi.list().then(setAllProjects).catch(() => {}); }, []);
 
   const handleDelete = (item: ProductDto) => {
     Alert.alert(t('products.confirmDelete'), item.product_name, [
@@ -329,98 +303,99 @@ export default function ProductsScreen() {
       setDetailProduct(full);
     } catch {
       Toast.show({ type: 'error', text1: t('common.error') });
-    } finally {
-      setLoadingDetail(false);
-    }
+    } finally { setLoadingDetail(false); }
   };
 
   const renderItem = ({ item }: { item: ProductDto }) => {
     const primaryImg = item.images?.find(i => i.is_primary) ?? item.images?.[0];
+    const imgUrl = primaryImg?.image_url ? toImageUrl(primaryImg.image_url) : null;
+
     return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        {primaryImg?.image_url ? (
-          <Image
-            source={{ uri: toImageUrl(primaryImg.image_url) }}
-            style={styles.cardImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.cardImagePlaceholder}>
-            <Text style={{ fontSize: 20 }}>📦</Text>
-          </View>
-        )}
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardName}>{item.product_name}</Text>
-          <View style={styles.typeBadge}>
-            <Text style={styles.typeBadgeText}>{item.product_type}</Text>
+      <View style={styles.card}>
+        <View style={styles.cardRow}>
+          {/* Thumbnail */}
+          {imgUrl ? (
+            <Image source={{ uri: imgUrl }} style={styles.thumb} resizeMode="cover" />
+          ) : (
+            <View style={styles.thumbPlaceholder}>
+              <Text style={{ fontSize: 22 }}>📦</Text>
+            </View>
+          )}
+
+          {/* Info */}
+          <View style={styles.cardInfo}>
+            <Text style={styles.cardName} numberOfLines={1}>{item.product_name}</Text>
+            <View style={styles.badges}>
+              <View style={styles.typeBadge}>
+                <Text style={styles.typeBadgeText}>{item.product_type.replace(/_/g, ' ')}</Text>
+              </View>
+              {item.copied_from_project_name && (
+                <View style={styles.copiedBadge}>
+                  <Text style={styles.copiedBadgeText}>copy</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.cardSub} numberOfLines={1}>{item.machine_type_name} · {item.machine_name}</Text>
+            <Text style={styles.cardCapacity}>{item.capacity?.toLocaleString()} <Text style={styles.cardCapacityUnit}>pcs/hr</Text></Text>
           </View>
         </View>
+
+        {/* Actions */}
+        <View style={styles.cardActions}>
+          <TouchableOpacity style={styles.actionIcon} onPress={() => handleOpenDetail(item)} disabled={loadingDetail}>
+            {loadingDetail ? <ActivityIndicator size="small" color={colors.accent} /> : <Text style={styles.actionIconText}>👁</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionIcon} onPress={() => setCopyProduct(item)}>
+            <Text style={styles.actionIconText}>📋</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.editBtn]}
+            onPress={() => router.push(`/(app)/product-form?id=${item.id}` as never)}
+          >
+            <Text style={styles.editBtnText}>{t('common.edit')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={() => handleDelete(item)}>
+            <Text style={styles.deleteBtnText}>{t('common.delete')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <Text style={styles.cardSub}>{item.machine_type_name} · {item.machine_name}</Text>
-      <Text style={styles.cardSub}>{item.project_name}</Text>
-      {item.copied_from_project_name ? (
-        <Text style={styles.copiedBadge}>{t('products.copiedFrom', { project: item.copied_from_project_name })}</Text>
-      ) : null}
-      <View style={styles.cardActions}>
-        {/* Info / Detail button */}
-        <TouchableOpacity
-          style={styles.iconBtn}
-          onPress={() => handleOpenDetail(item)}
-          disabled={loadingDetail}
-        >
-          {loadingDetail ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Text style={styles.iconBtnText}>👁</Text>
-          )}
-        </TouchableOpacity>
-        {/* Copy button */}
-        <TouchableOpacity
-          style={styles.iconBtn}
-          onPress={() => setCopyProduct(item)}
-        >
-          <Text style={styles.iconBtnText}>📋</Text>
-        </TouchableOpacity>
-        <AppButton
-          title={t('common.edit')}
-          onPress={() => router.push(`/(app)/product-form?id=${item.id}`)}
-          variant="secondary"
-          style={styles.actionBtn}
-        />
-        <AppButton
-          title={t('common.delete')}
-          onPress={() => handleDelete(item)}
-          variant="danger"
-          style={styles.actionBtn}
-        />
-      </View>
-    </View>
     );
   };
 
-  const hasMore = products.length < total;
-
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+
+      {/* Top bar */}
       <View style={styles.topBar}>
-        <Text style={styles.pageTitle}>{t('products.title')}</Text>
-        <AppButton
-          title={t('products.new')}
-          onPress={() => router.push(projectId ? `/(app)/product-form?project_id=${projectId}` as never : '/(app)/product-form')}
+        <View>
+          <Text style={styles.pageTitle}>{t('products.title')}</Text>
+          <Text style={styles.pageSubtitle}>{total} {t('common.total') ?? 'total'}</Text>
+        </View>
+        <TouchableOpacity
           style={styles.newBtn}
-        />
+          onPress={() => router.push(projectId ? `/(app)/product-form?project_id=${projectId}` as never : '/(app)/product-form')}
+        >
+          <Text style={styles.newBtnText}>+ {t('products.new')}</Text>
+        </TouchableOpacity>
       </View>
 
+      {/* Search */}
       <View style={styles.searchBar}>
+        <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
           placeholder={t('products.search')}
-          placeholderTextColor={colors.gray400}
+          placeholderTextColor={colors.muted}
           value={search}
-          onChangeText={s => { setSearch(s); }}
+          onChangeText={s => setSearch(s)}
           returnKeyType="search"
         />
+        {search ? (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Text style={{ color: colors.muted, fontSize: 18 }}>×</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <FlatList
@@ -428,71 +403,87 @@ export default function ProductsScreen() {
         keyExtractor={item => String(item.id)}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void fetchProducts(1, true); }} />}
-        ListEmptyComponent={!isLoading ? <Text style={styles.empty}>{t('common.noData')}</Text> : null}
-        onEndReached={() => { if (hasMore && !isLoading) void fetchProducts(page + 1); }}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.accent} onRefresh={() => { setRefreshing(true); void fetchProducts(1, true); }} />}
+        ListEmptyComponent={!isLoading ? (
+          <View style={styles.empty}>
+            <Text style={{ fontSize: 40, marginBottom: spacing.md }}>📦</Text>
+            <Text style={styles.emptyText}>{t('common.noData')}</Text>
+          </View>
+        ) : (
+          <ActivityIndicator color={colors.accent} style={{ marginTop: 60 }} />
+        )}
+        onEndReached={() => { if (products.length < total && !isLoading) void fetchProducts(page + 1); }}
         onEndReachedThreshold={0.3}
       />
 
-      {/* Product Detail Modal */}
-      {detailProduct ? (
-        <ProductDetailModal
-          product={detailProduct}
-          onClose={() => setDetailProduct(null)}
-        />
-      ) : null}
-
-      {/* Copy Product Modal */}
-      {copyProduct ? (
+      {detailProduct && <ProductDetailModal product={detailProduct} onClose={() => setDetailProduct(null)} />}
+      {copyProduct && (
         <CopyProductModal
           product={copyProduct}
           projects={allProjects}
           onClose={() => setCopyProduct(null)}
           onSuccess={() => void fetchProducts(1, true)}
         />
-      ) : null}
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.gray50 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, paddingBottom: spacing.sm },
-  pageTitle: { fontSize: fontSize.xl, fontWeight: '700', color: colors.gray900 },
-  newBtn: { paddingVertical: 8, paddingHorizontal: 14 },
-  searchBar: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
-  searchInput: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 9,
-    fontSize: fontSize.base,
-    color: colors.gray900,
+  safe: { flex: 1, backgroundColor: colors.bg },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
+  pageTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.text },
+  pageSubtitle: { fontSize: fontSize.sm, color: colors.muted, marginTop: 2 },
+  newBtn: { backgroundColor: colors.accentDark, paddingHorizontal: 16, paddingVertical: 9, borderRadius: radius.md },
+  newBtnText: { color: colors.text, fontWeight: '700', fontSize: fontSize.sm },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    marginHorizontal: spacing.lg, marginBottom: spacing.sm,
+    backgroundColor: colors.surface2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 10,
+    borderWidth: 1, borderColor: colors.border,
   },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, color: colors.text, fontSize: fontSize.base },
   list: { padding: spacing.lg, gap: spacing.md, paddingTop: spacing.sm },
-  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: colors.gray200 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  cardImage: { width: 56, height: 56, borderRadius: radius.md, flexShrink: 0 },
-  cardImagePlaceholder: { width: 56, height: 56, borderRadius: radius.md, backgroundColor: colors.gray100, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  cardName: { fontSize: fontSize.md, fontWeight: '600', color: colors.gray900, marginBottom: 4 },
-  typeBadge: { backgroundColor: colors.gray100, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start' },
-  typeBadgeText: { fontSize: fontSize.xs, color: colors.gray600 },
-  cardSub: { fontSize: fontSize.sm, color: colors.gray500 },
-  copiedBadge: { fontSize: fontSize.xs, color: colors.primary, fontStyle: 'italic' },
-  cardActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs, alignItems: 'center' },
-  actionBtn: { flex: 1, paddingVertical: 7 },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    backgroundColor: colors.gray100,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    alignItems: 'center',
-    justifyContent: 'center',
+  card: {
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
   },
-  iconBtnText: { fontSize: 16 },
-  empty: { textAlign: 'center', color: colors.gray400, marginTop: 60 },
+  cardRow: { flexDirection: 'row', padding: spacing.md, gap: spacing.md },
+  thumb: { width: 72, height: 72, borderRadius: radius.md, flexShrink: 0 },
+  thumbPlaceholder: {
+    width: 72, height: 72, borderRadius: radius.md,
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  cardInfo: { flex: 1, gap: 4, justifyContent: 'center' },
+  cardName: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
+  badges: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
+  typeBadge: {
+    backgroundColor: colors.accentSoft, borderRadius: radius.full,
+    paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: colors.borderAccent,
+  },
+  typeBadgeText: { fontSize: fontSize.xs, color: colors.accent, fontWeight: '600' },
+  copiedBadge: { backgroundColor: 'rgba(245,158,11,0.1)', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' },
+  copiedBadgeText: { fontSize: fontSize.xs, color: colors.warning, fontWeight: '600' },
+  cardSub: { fontSize: fontSize.sm, color: colors.subtext },
+  cardCapacity: { fontSize: fontSize.md, fontWeight: '700', color: colors.accent },
+  cardCapacityUnit: { fontSize: fontSize.xs, color: colors.muted, fontWeight: '400' },
+  cardActions: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingHorizontal: spacing.md, paddingBottom: spacing.md,
+  },
+  actionIcon: {
+    width: 36, height: 36, borderRadius: radius.md,
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  actionIconText: { fontSize: 16 },
+  actionBtn: { flex: 1, paddingVertical: 8, borderRadius: radius.md, alignItems: 'center', borderWidth: 1 },
+  editBtn: { backgroundColor: colors.surface2, borderColor: colors.border },
+  editBtnText: { color: colors.subtext, fontSize: fontSize.sm, fontWeight: '600' },
+  deleteBtn: { backgroundColor: colors.dangerSoft, borderColor: colors.danger + '40' },
+  deleteBtnText: { color: colors.danger, fontSize: fontSize.sm, fontWeight: '600' },
+  empty: { alignItems: 'center', marginTop: 80 },
+  emptyText: { color: colors.muted, fontSize: fontSize.base },
 });

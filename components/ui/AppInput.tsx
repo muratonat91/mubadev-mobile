@@ -12,7 +12,7 @@ export function AppInput({ label, error, style, ...props }: Props) {
       {label ? <Text style={styles.label}>{label}</Text> : null}
       <TextInput
         style={[styles.input, error ? styles.inputError : null, style]}
-        placeholderTextColor={colors.gray400}
+        placeholderTextColor={colors.muted}
         {...props}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -21,17 +21,17 @@ export function AppInput({ label, error, style, ...props }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { gap: 4 },
-  label: { fontSize: fontSize.sm, fontWeight: '500', color: colors.gray700 },
+  wrapper: { gap: 6 },
+  label: { fontSize: fontSize.sm, fontWeight: '600', color: colors.subtext, letterSpacing: 0.3 },
   input: {
     borderWidth: 1,
-    borderColor: colors.gray300,
+    borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontSize: fontSize.base,
-    color: colors.gray900,
-    backgroundColor: colors.white,
+    color: colors.text,
+    backgroundColor: colors.surface2,
   },
   inputError: { borderColor: colors.danger },
   error: { fontSize: fontSize.xs, color: colors.danger },

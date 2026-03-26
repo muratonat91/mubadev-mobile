@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Switch,
-  Image, FlatList, ActivityIndicator,
+  Image, ActivityIndicator, StatusBar,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,9 @@ import Toast from 'react-native-toast-message';
 import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import { ProductsApi, type ProductPayload, type ProductImageDto } from '../../api/products.api';
+
+const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'https://icematrix.site/api').replace('/api', '');
+const toImageUrl = (path: string) => path?.startsWith('http') ? path : `${API_BASE}${path}`;
 import { ProjectsApi, type ProjectDto } from '../../api/projects.api';
 import { AppButton } from '../../components/ui/AppButton';
 import { AppInput } from '../../components/ui/AppInput';
@@ -106,6 +109,15 @@ export default function ProductFormScreen() {
 
   useEffect(() => { void ProjectsApi.list().then(setProjects); }, []);
 
+  // Reset form when navigating to new product (fix: state persists between routes)
+  useEffect(() => {
+    if (!isEdit) {
+      setForm({ ...DEFAULTS, project_id: params.project_id ?? '' });
+      setImages([]);
+      setStep(0);
+    }
+  }, [isEdit, params.project_id]);
+
   useEffect(() => {
     if (isEdit) {
       void ProductsApi.getById(Number(params.id)).then(p => {
@@ -132,7 +144,7 @@ export default function ProductFormScreen() {
         // Load existing images
         const existingImages = (r.images as ProductImageDto[] | undefined) ?? [];
         setImages(existingImages.map(img => ({
-          uri: img.image_url,
+          uri: toImageUrl(img.image_url),
           isPrimary: img.is_primary,
           existingId: img.id,
         })));
@@ -274,10 +286,11 @@ export default function ProductFormScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backBtn}>← {t('common.back')}</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtnWrap}>
+          <Text style={styles.backBtn}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {isEdit ? t('common.edit') : t('products.new')}
@@ -496,61 +509,60 @@ function Row({ label, value, onChange }: { label: string; value: boolean; onChan
 }
 
 const rowStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs },
-  label: { fontSize: fontSize.base, color: colors.gray700, flex: 1 },
+  row: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface2, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  label: { fontSize: fontSize.base, color: colors.text, flex: 1 },
 });
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.gray50 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, paddingBottom: spacing.sm },
-  backBtn: { fontSize: fontSize.base, color: colors.primary, fontWeight: '600' },
-  headerTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.gray900 },
-  stepCount: { fontSize: fontSize.sm, color: colors.gray500 },
-  stepDots: { flexDirection: 'row', gap: 6, justifyContent: 'center', paddingBottom: spacing.sm },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.gray300 },
-  dotActive: { backgroundColor: colors.primary, width: 20 },
-  dotDone: { backgroundColor: colors.primary },
-  stepLabel: { textAlign: 'center', fontSize: fontSize.sm, fontWeight: '600', color: colors.primary, marginBottom: spacing.sm },
+  safe: { flex: 1, backgroundColor: colors.bg },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: spacing.lg, paddingBottom: spacing.sm,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  backBtnWrap: {
+    width: 36, height: 36, borderRadius: radius.md,
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  backBtn: { fontSize: fontSize.lg, color: colors.accent, fontWeight: '700' },
+  headerTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+  stepCount: { fontSize: fontSize.sm, color: colors.muted },
+  stepDots: { flexDirection: 'row', gap: 6, justifyContent: 'center', paddingVertical: spacing.md },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border },
+  dotActive: { backgroundColor: colors.accent, width: 24, borderColor: colors.accent },
+  dotDone: { backgroundColor: colors.accentDark, borderColor: colors.accentDark },
+  stepLabel: { textAlign: 'center', fontSize: fontSize.sm, fontWeight: '700', color: colors.accent, marginBottom: spacing.md, textTransform: 'uppercase', letterSpacing: 0.8 },
   scroll: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
   fields: { gap: spacing.md },
-  navBar: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray200, backgroundColor: colors.white },
+  navBar: {
+    flexDirection: 'row', gap: spacing.md, padding: spacing.lg,
+    borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface,
+  },
   navBtn: { minWidth: 100 },
-  // Images step
-  imageHint: { fontSize: fontSize.sm, color: colors.gray500, lineHeight: 20 },
+  imageHint: { fontSize: fontSize.sm, color: colors.subtext, lineHeight: 20 },
   imageScroll: { gap: spacing.sm, paddingVertical: spacing.sm },
   imageThumbnailContainer: { position: 'relative', marginRight: spacing.sm },
-  imageThumbnail: {
-    width: 100,
-    height: 100,
-    borderRadius: radius.md,
-    borderWidth: 2,
-    borderColor: colors.gray200,
-  },
+  imageThumbnail: { width: 100, height: 100, borderRadius: radius.md, borderWidth: 2, borderColor: colors.border },
   primaryBadge: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    right: 4,
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingVertical: 2,
-    alignItems: 'center',
+    position: 'absolute', bottom: 4, left: 4, right: 4,
+    backgroundColor: colors.accentDark, borderRadius: radius.sm,
+    paddingVertical: 2, alignItems: 'center',
   },
-  primaryBadgeText: { color: colors.white, fontSize: fontSize.xs, fontWeight: '700' },
+  primaryBadgeText: { color: colors.text, fontSize: fontSize.xs, fontWeight: '700' },
   removeImageBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: 4, right: 4,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center',
   },
   removeImageBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
-  imageCount: { fontSize: fontSize.xs, color: colors.gray500, textAlign: 'center' },
+  imageCount: { fontSize: fontSize.xs, color: colors.muted, textAlign: 'center' },
   uploadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, justifyContent: 'center' },
-  uploadingText: { fontSize: fontSize.sm, color: colors.primary },
+  uploadingText: { fontSize: fontSize.sm, color: colors.accent },
 });

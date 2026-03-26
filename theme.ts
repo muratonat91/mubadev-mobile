@@ -1,10 +1,28 @@
 export const colors = {
-  primary: '#2563eb',
-  primaryDark: '#1d4ed8',
-  primaryLight: '#eff6ff',
-  danger: '#dc2626',
-  success: '#16a34a',
-  warning: '#d97706',
+  // Dark theme (primary)
+  bg: '#04111d',
+  surface: '#0a1e30',
+  surface2: '#0d2137',
+  border: 'rgba(91,200,232,0.12)',
+  borderAccent: 'rgba(91,200,232,0.3)',
+  accent: '#5bc8e8',
+  accentDark: '#1b8dba',
+  accentSoft: 'rgba(91,200,232,0.08)',
+  text: '#e0f5fb',
+  subtext: '#7badc7',
+  muted: '#3d6b8a',
+
+  // Semantic
+  primary: '#1b8dba',
+  primaryDark: '#004566',
+  primaryLight: 'rgba(91,200,232,0.1)',
+  danger: '#ef4444',
+  dangerSoft: 'rgba(239,68,68,0.12)',
+  success: '#22c55e',
+  successSoft: 'rgba(34,197,94,0.12)',
+  warning: '#f59e0b',
+
+  // Legacy (keep for compatibility)
   gray50: '#f9fafb',
   gray100: '#f3f4f6',
   gray200: '#e5e7eb',
@@ -30,6 +48,7 @@ export const radius = {
   sm: 6,
   md: 10,
   lg: 16,
+  xl: 20,
   full: 9999,
 };
 
@@ -40,5 +59,5 @@ export const fontSize = {
   md: 16,
   lg: 18,
   xl: 22,
-  '2xl': 26,
+  '2xl': 28,
 };
