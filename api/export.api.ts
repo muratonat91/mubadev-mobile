@@ -2,7 +2,7 @@ import api from './axios';
 
 export const ExportApi = {
   downloadPdf: (projectId: number) =>
-    api.get(`/export/pdf/${projectId}`, { responseType: 'arraybuffer' }),
+    api.get(`/export/projects/${projectId}/pdf`, { responseType: 'arraybuffer' }),
   downloadExcel: (projectId: number) =>
-    api.get(`/export/excel/${projectId}`, { responseType: 'arraybuffer' }),
+    api.get(`/export/projects/${projectId}/excel`, { responseType: 'arraybuffer' }),
 };

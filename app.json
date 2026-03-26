@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "MubaDev",
+    "name": "MUBADEV Matrix",
     "slug": "mubadev",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,17 +9,18 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2563eb"
+      "backgroundColor": "#04111d"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.mubadev.matrix"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#2563eb"
+        "backgroundColor": "#04111d"
       },
-      "package": "com.anonymous.mubadev"
+      "package": "com.mubadev.matrix"
     },
     "plugins": [
       "expo-router"
@@ -27,6 +28,15 @@
     "scheme": "mubadev",
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "692f1338-a166-498c-97fc-d5f058763821"
+      },
+      "router": {
+        "origin": false
+      }
+    },
+    "owner": "muratasd"
   }
 }

@@ -2,8 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, RefreshControl, Modal, ScrollView,
-  ActivityIndicator,
+  ActivityIndicator, Image,
 } from 'react-native';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL?.replace('/api', '') ?? 'https://icematrix.site';
+const toImageUrl = (path: string) => path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -331,12 +334,27 @@ export default function ProductsScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: ProductDto }) => (
+  const renderItem = ({ item }: { item: ProductDto }) => {
+    const primaryImg = item.images?.find(i => i.is_primary) ?? item.images?.[0];
+    return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Text style={styles.cardName}>{item.product_name}</Text>
-        <View style={styles.typeBadge}>
-          <Text style={styles.typeBadgeText}>{item.product_type}</Text>
+        {primaryImg?.image_url ? (
+          <Image
+            source={{ uri: toImageUrl(primaryImg.image_url) }}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.cardImagePlaceholder}>
+            <Text style={{ fontSize: 20 }}>📦</Text>
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardName}>{item.product_name}</Text>
+          <View style={styles.typeBadge}>
+            <Text style={styles.typeBadgeText}>{item.product_type}</Text>
+          </View>
         </View>
       </View>
       <Text style={styles.cardSub}>{item.machine_type_name} · {item.machine_name}</Text>
@@ -378,7 +396,8 @@ export default function ProductsScreen() {
         />
       </View>
     </View>
-  );
+    );
+  };
 
   const hasMore = products.length < total;
 
@@ -388,7 +407,7 @@ export default function ProductsScreen() {
         <Text style={styles.pageTitle}>{t('products.title')}</Text>
         <AppButton
           title={t('products.new')}
-          onPress={() => router.push(`/(app)/product-form${projectId ? `?project_id=${projectId}` : ''}`)}
+          onPress={() => router.push(projectId ? `/(app)/product-form?project_id=${projectId}` as never : '/(app)/product-form')}
           style={styles.newBtn}
         />
       </View>
@@ -454,9 +473,11 @@ const styles = StyleSheet.create({
   },
   list: { padding: spacing.lg, gap: spacing.md, paddingTop: spacing.sm },
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: colors.gray200 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
-  cardName: { fontSize: fontSize.md, fontWeight: '600', color: colors.gray900, flex: 1 },
-  typeBadge: { backgroundColor: colors.gray100, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  cardImage: { width: 56, height: 56, borderRadius: radius.md, flexShrink: 0 },
+  cardImagePlaceholder: { width: 56, height: 56, borderRadius: radius.md, backgroundColor: colors.gray100, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  cardName: { fontSize: fontSize.md, fontWeight: '600', color: colors.gray900, marginBottom: 4 },
+  typeBadge: { backgroundColor: colors.gray100, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start' },
   typeBadgeText: { fontSize: fontSize.xs, color: colors.gray600 },
   cardSub: { fontSize: fontSize.sm, color: colors.gray500 },
   copiedBadge: { fontSize: fontSize.xs, color: colors.primary, fontStyle: 'italic' },

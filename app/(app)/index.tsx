@@ -30,7 +30,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.appName}>ProjectConfigurator</Text>
+            <Text style={styles.appName}>MUBADEV Matrix</Text>
             <Text style={styles.greeting}>
               {user?.first_name ? `👋 ${user.first_name}` : `👋 ${user?.email}`}
             </Text>
