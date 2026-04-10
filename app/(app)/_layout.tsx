@@ -10,9 +10,14 @@ export default function AppLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.gray400,
-        tabBarStyle: { borderTopColor: colors.gray200 },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
       <Tabs.Screen
@@ -35,11 +40,7 @@ export default function AppLayout() {
         name="profile"
         options={{ title: t('nav.profile'), tabBarIcon: ({ color }) => <TabIcon emoji="👤" color={color} /> }}
       />
-      {/* Hidden screens — not shown in tabs */}
-      <Tabs.Screen
-        name="product-form"
-        options={{ href: null }}
-      />
+      <Tabs.Screen name="product-form" options={{ href: null }} />
     </Tabs>
   );
 }

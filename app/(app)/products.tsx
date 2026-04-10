@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, RefreshControl, Modal, ScrollView,
   ActivityIndicator, Image, StatusBar,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { useTranslation } from 'react-i18next';
@@ -13,9 +13,13 @@ import { ProjectsApi, type ProjectDto } from '../../api/projects.api';
 import { colors, spacing, fontSize, radius } from '../../theme';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'https://icematrix.site/api').replace('/api', '');
-const toImageUrl = (path: string) => path?.startsWith('http') ? path : `${API_BASE}${path}`;
+const toImageUrl = (path?: string | null) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return `${API_BASE}${path}`;
+};
 
-// ─── Detail Modal ──────────────────────────────────────────────────────────────
+// ─── Spec Row ──────────────────────────────────────────────────────────────────
 function SpecRow({ label, value }: { label: string; value: unknown }) {
   if (value === null || value === undefined || value === '') return null;
   const isBoolean = typeof value === 'boolean';
@@ -24,7 +28,9 @@ function SpecRow({ label, value }: { label: string; value: unknown }) {
       <Text style={detailS.label}>{label}</Text>
       {isBoolean ? (
         <View style={[detailS.badge, value ? detailS.yes : detailS.no]}>
-          <Text style={[detailS.badgeText, { color: value ? colors.success : colors.danger }]}>{value ? '✓ Yes' : '✗ No'}</Text>
+          <Text style={[detailS.badgeText, { color: value ? colors.success : colors.danger }]}>
+            {value ? '✓ Yes' : '✗ No'}
+          </Text>
         </View>
       ) : (
         <Text style={detailS.value}>{String(value)}</Text>
@@ -33,15 +39,16 @@ function SpecRow({ label, value }: { label: string; value: unknown }) {
   );
 }
 
+// ─── Detail Modal ──────────────────────────────────────────────────────────────
 function ProductDetailModal({ product, onClose }: { product: ProductDto; onClose: () => void }) {
   const { t } = useTranslation();
   const images = product.images ?? [];
+  const [imgIndex, setImgIndex] = useState(0);
 
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
         <StatusBar barStyle="light-content" />
-        {/* Header */}
         <View style={detailS.header}>
           <TouchableOpacity onPress={onClose} style={detailS.closeBtn}>
             <Text style={detailS.closeBtnText}>←</Text>
@@ -50,33 +57,42 @@ function ProductDetailModal({ product, onClose }: { product: ProductDto; onClose
         </View>
 
         <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }} showsVerticalScrollIndicator={false}>
-          {/* Images */}
+          {/* Image slider */}
           {images.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
-              {images.map((img, i) => (
-                <Image
-                  key={i}
-                  source={{ uri: toImageUrl(img.image_url) }}
-                  style={detailS.image}
-                  resizeMode="cover"
-                />
-              ))}
-            </ScrollView>
+            <View>
+              <Image
+                source={{ uri: toImageUrl(images[imgIndex]?.image_path) ?? '' }}
+                style={detailS.mainImage}
+                resizeMode="cover"
+              />
+              {images.length > 1 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingTop: spacing.sm }}>
+                  {images.map((img, i) => (
+                    <TouchableOpacity key={img.id} onPress={() => setImgIndex(i)}>
+                      <Image
+                        source={{ uri: toImageUrl(img.image_path) ?? '' }}
+                        style={[detailS.thumb, i === imgIndex && detailS.thumbActive]}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
           )}
 
           {/* Capacity hero */}
           <View style={detailS.heroCard}>
-            <Text style={detailS.heroLabel}>Capacity</Text>
+            <Text style={detailS.heroLabel}>CAPACITY</Text>
             <Text style={detailS.heroValue}>{product.capacity?.toLocaleString()}</Text>
             <Text style={detailS.heroUnit}>pcs / hr</Text>
           </View>
 
-          {/* Specs */}
           <View style={detailS.section}>
             <Text style={detailS.sectionTitle}>{t('products.steps.machine')}</Text>
             <SpecRow label={t('products.fields.machineType')} value={product.machine_type_name} />
             <SpecRow label={t('products.fields.machine')} value={product.machine_name} />
-            <SpecRow label={t('products.fields.project')} value={product.project_name} />
+            <SpecRow label="Project" value={product.project_name} />
           </View>
 
           <View style={detailS.section}>
@@ -98,7 +114,9 @@ function ProductDetailModal({ product, onClose }: { product: ProductDto; onClose
             <Text style={detailS.sectionTitle}>{t('products.steps.filling')}</Text>
             <SpecRow label={t('products.fields.fillingPattern')} value={product.filling_pattern} />
             <SpecRow label={t('products.fields.liquidSauceTopping')} value={product.liquid_sauce_topping} />
+            <SpecRow label="Liquid Sauce Type" value={product.liquid_sauce_topping_type} />
             <SpecRow label={t('products.fields.dryTopping')} value={product.dry_topping} />
+            <SpecRow label="Dry Topping Type & Size" value={product.dry_topping_type_size} />
           </View>
 
           <View style={detailS.section}>
@@ -107,6 +125,7 @@ function ProductDetailModal({ product, onClose }: { product: ProductDto; onClose
             <SpecRow label={t('products.fields.chocolateCoatingType')} value={product.chocolate_coating_type} />
             <SpecRow label={t('products.fields.coatingSequence')} value={product.coating_sequence} />
             <SpecRow label={t('products.fields.dryStuffInChocolate')} value={product.dry_stuff_in_chocolate} />
+            <SpecRow label="Dry Stuff Type" value={product.dry_stuff_type} />
           </View>
 
           <View style={detailS.section}>
@@ -116,6 +135,7 @@ function ProductDetailModal({ product, onClose }: { product: ProductDto; onClose
             <SpecRow label={t('products.fields.widthW')} value={product.product_width_w ? `${product.product_width_w} mm` : null} />
             <SpecRow label={t('products.fields.thicknessH')} value={product.product_thickness_h ? `${product.product_thickness_h} mm` : null} />
             <SpecRow label={t('products.fields.diameter')} value={product.product_diameter ? `${product.product_diameter} mm` : null} />
+            <SpecRow label="Cone Degree" value={product.cone_degree} />
           </View>
 
           {(product.stick_type || product.stick_length) && (
@@ -140,12 +160,8 @@ function ProductDetailModal({ product, onClose }: { product: ProductDto; onClose
 
 const detailS = StyleSheet.create({
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.lg,
-    gap: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', padding: spacing.lg, gap: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: radius.md,
@@ -154,13 +170,15 @@ const detailS = StyleSheet.create({
   },
   closeBtnText: { fontSize: fontSize.lg, color: colors.accent, fontWeight: '700' },
   title: { flex: 1, fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
-  image: { width: 200, height: 140, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
+  mainImage: { width: '100%', height: 220, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
+  thumb: { width: 64, height: 64, borderRadius: radius.md, borderWidth: 2, borderColor: colors.border, opacity: 0.6 },
+  thumbActive: { borderColor: colors.accent, opacity: 1 },
   heroCard: {
     backgroundColor: colors.surface2, borderRadius: radius.lg, padding: spacing.lg,
     alignItems: 'center', borderWidth: 1, borderColor: colors.borderAccent,
   },
-  heroLabel: { fontSize: fontSize.xs, color: colors.muted, letterSpacing: 1, textTransform: 'uppercase' },
-  heroValue: { fontSize: 36, fontWeight: '800', color: colors.accent, marginVertical: 4 },
+  heroLabel: { fontSize: fontSize.xs, color: colors.muted, letterSpacing: 1.2, textTransform: 'uppercase' },
+  heroValue: { fontSize: 40, fontWeight: '800', color: colors.accent, marginVertical: 4 },
   heroUnit: { fontSize: fontSize.sm, color: colors.subtext },
   section: {
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
@@ -170,9 +188,9 @@ const detailS = StyleSheet.create({
     fontSize: fontSize.xs, fontWeight: '700', color: colors.accent,
     textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing.sm,
   },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.border },
   label: { fontSize: fontSize.sm, color: colors.subtext, flex: 1 },
-  value: { fontSize: fontSize.sm, color: colors.text, fontWeight: '500', textAlign: 'right' },
+  value: { fontSize: fontSize.sm, color: colors.text, fontWeight: '500', textAlign: 'right', flex: 1 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.full, borderWidth: 1 },
   yes: { backgroundColor: colors.successSoft, borderColor: colors.success + '40' },
   no: { backgroundColor: colors.dangerSoft, borderColor: colors.danger + '40' },
@@ -206,7 +224,7 @@ function CopyProductModal({ product, projects, onClose, onSuccess }: {
         <View style={copyS.sheet}>
           <Text style={copyS.title}>{t('products.copyTo')}</Text>
           <Text style={copyS.subtitle}>{product.product_name}</Text>
-          <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
             {projects.map(p => (
               <TouchableOpacity
                 key={p.id}
@@ -261,7 +279,7 @@ export default function ProductsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [detailProduct, setDetailProduct] = useState<ProductDto | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loadingDetailId, setLoadingDetailId] = useState<number | null>(null);
   const [copyProduct, setCopyProduct] = useState<ProductDto | null>(null);
   const [allProjects, setAllProjects] = useState<ProjectDto[]>([]);
 
@@ -273,14 +291,24 @@ export default function ProductsScreen() {
       setProducts(prev => reset ? result.data : [...prev, ...result.data]);
       setTotal(result.meta.total);
       setPage(p);
+    } catch {
+      // silent
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
   }, [projectId, search]);
 
-  useEffect(() => { void fetchProducts(1, true); }, [fetchProducts]);
-  useEffect(() => { void ProjectsApi.list().then(setAllProjects).catch(() => {}); }, []);
+  // Refresh every time screen comes into focus (handles navigate-back after add/edit)
+  useFocusEffect(useCallback(() => {
+    setIsLoading(true);
+    void fetchProducts(1, true);
+  }, [fetchProducts]));
+
+  // Load all projects for copy modal
+  useFocusEffect(useCallback(() => {
+    void ProjectsApi.list().then(setAllProjects).catch(() => {});
+  }, []));
 
   const handleDelete = (item: ProductDto) => {
     Alert.alert(t('products.confirmDelete'), item.product_name, [
@@ -288,41 +316,45 @@ export default function ProductsScreen() {
       {
         text: t('common.delete'), style: 'destructive',
         onPress: async () => {
-          await ProductsApi.delete(item.id);
-          setProducts(prev => prev.filter(p => p.id !== item.id));
-          Toast.show({ type: 'success', text1: t('products.toastDeleted') });
+          try {
+            await ProductsApi.delete(item.id);
+            setProducts(prev => prev.filter(p => p.id !== item.id));
+            setTotal(prev => prev - 1);
+            Toast.show({ type: 'success', text1: t('products.toastDeleted') });
+          } catch {
+            Toast.show({ type: 'error', text1: t('common.error') });
+          }
         },
       },
     ]);
   };
 
   const handleOpenDetail = async (item: ProductDto) => {
-    setLoadingDetail(true);
+    setLoadingDetailId(item.id);
     try {
       const full = await ProductsApi.getById(item.id);
       setDetailProduct(full);
     } catch {
       Toast.show({ type: 'error', text1: t('common.error') });
-    } finally { setLoadingDetail(false); }
+    } finally { setLoadingDetailId(null); }
   };
 
   const renderItem = ({ item }: { item: ProductDto }) => {
+    // Images come from list API with image_path field
     const primaryImg = item.images?.find(i => i.is_primary) ?? item.images?.[0];
-    const imgUrl = primaryImg?.image_url ? toImageUrl(primaryImg.image_url) : null;
+    const imgUrl = toImageUrl(primaryImg?.image_path);
 
     return (
       <View style={styles.card}>
         <View style={styles.cardRow}>
-          {/* Thumbnail */}
           {imgUrl ? (
             <Image source={{ uri: imgUrl }} style={styles.thumb} resizeMode="cover" />
           ) : (
             <View style={styles.thumbPlaceholder}>
-              <Text style={{ fontSize: 22 }}>📦</Text>
+              <Text style={{ fontSize: 24 }}>📦</Text>
             </View>
           )}
 
-          {/* Info */}
           <View style={styles.cardInfo}>
             <Text style={styles.cardName} numberOfLines={1}>{item.product_name}</Text>
             <View style={styles.badges}>
@@ -336,14 +368,21 @@ export default function ProductsScreen() {
               )}
             </View>
             <Text style={styles.cardSub} numberOfLines={1}>{item.machine_type_name} · {item.machine_name}</Text>
-            <Text style={styles.cardCapacity}>{item.capacity?.toLocaleString()} <Text style={styles.cardCapacityUnit}>pcs/hr</Text></Text>
+            <Text style={styles.cardCapacity}>
+              {item.capacity?.toLocaleString()} <Text style={styles.cardCapacityUnit}>pcs/hr</Text>
+            </Text>
           </View>
         </View>
 
-        {/* Actions */}
         <View style={styles.cardActions}>
-          <TouchableOpacity style={styles.actionIcon} onPress={() => handleOpenDetail(item)} disabled={loadingDetail}>
-            {loadingDetail ? <ActivityIndicator size="small" color={colors.accent} /> : <Text style={styles.actionIconText}>👁</Text>}
+          <TouchableOpacity
+            style={styles.actionIcon}
+            onPress={() => handleOpenDetail(item)}
+            disabled={loadingDetailId === item.id}
+          >
+            {loadingDetailId === item.id
+              ? <ActivityIndicator size="small" color={colors.accent} />
+              : <Text style={styles.actionIconText}>👁</Text>}
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionIcon} onPress={() => setCopyProduct(item)}>
             <Text style={styles.actionIconText}>📋</Text>
@@ -366,7 +405,6 @@ export default function ProductsScreen() {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
 
-      {/* Top bar */}
       <View style={styles.topBar}>
         <View>
           <Text style={styles.pageTitle}>{t('products.title')}</Text>
@@ -374,13 +412,16 @@ export default function ProductsScreen() {
         </View>
         <TouchableOpacity
           style={styles.newBtn}
-          onPress={() => router.push(projectId ? `/(app)/product-form?project_id=${projectId}` as never : '/(app)/product-form')}
+          onPress={() => router.push(
+            projectId
+              ? `/(app)/product-form?project_id=${projectId}` as never
+              : '/(app)/product-form' as never
+          )}
         >
           <Text style={styles.newBtnText}>+ {t('products.new')}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Search */}
       <View style={styles.searchBar}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -403,26 +444,36 @@ export default function ProductsScreen() {
         keyExtractor={item => String(item.id)}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.accent} onRefresh={() => { setRefreshing(true); void fetchProducts(1, true); }} />}
-        ListEmptyComponent={!isLoading ? (
-          <View style={styles.empty}>
-            <Text style={{ fontSize: 40, marginBottom: spacing.md }}>📦</Text>
-            <Text style={styles.emptyText}>{t('common.noData')}</Text>
-          </View>
-        ) : (
-          <ActivityIndicator color={colors.accent} style={{ marginTop: 60 }} />
-        )}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={colors.accent}
+            onRefresh={() => { setRefreshing(true); void fetchProducts(1, true); }}
+          />
+        }
+        ListEmptyComponent={
+          isLoading
+            ? <ActivityIndicator color={colors.accent} style={{ marginTop: 60 }} />
+            : (
+              <View style={styles.empty}>
+                <Text style={{ fontSize: 44, marginBottom: spacing.md }}>📦</Text>
+                <Text style={styles.emptyText}>{t('common.noData')}</Text>
+              </View>
+            )
+        }
         onEndReached={() => { if (products.length < total && !isLoading) void fetchProducts(page + 1); }}
         onEndReachedThreshold={0.3}
       />
 
-      {detailProduct && <ProductDetailModal product={detailProduct} onClose={() => setDetailProduct(null)} />}
+      {detailProduct && (
+        <ProductDetailModal product={detailProduct} onClose={() => setDetailProduct(null)} />
+      )}
       {copyProduct && (
         <CopyProductModal
           product={copyProduct}
           projects={allProjects}
           onClose={() => setCopyProduct(null)}
-          onSuccess={() => void fetchProducts(1, true)}
+          onSuccess={() => { void fetchProducts(1, true); }}
         />
       )}
     </SafeAreaView>
@@ -431,7 +482,10 @@ export default function ProductsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm,
+  },
   pageTitle: { fontSize: fontSize.xl, fontWeight: '800', color: colors.text },
   pageSubtitle: { fontSize: fontSize.sm, color: colors.muted, marginTop: 2 },
   newBtn: { backgroundColor: colors.accentDark, paddingHorizontal: 16, paddingVertical: 9, borderRadius: radius.md },
@@ -439,7 +493,8 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     marginHorizontal: spacing.lg, marginBottom: spacing.sm,
-    backgroundColor: colors.surface2, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 10,
+    backgroundColor: colors.surface2, borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: 10,
     borderWidth: 1, borderColor: colors.border,
   },
   searchIcon: { fontSize: 14 },
@@ -450,9 +505,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
   },
   cardRow: { flexDirection: 'row', padding: spacing.md, gap: spacing.md },
-  thumb: { width: 72, height: 72, borderRadius: radius.md, flexShrink: 0 },
+  thumb: { width: 80, height: 80, borderRadius: radius.md, flexShrink: 0 },
   thumbPlaceholder: {
-    width: 72, height: 72, borderRadius: radius.md,
+    width: 80, height: 80, borderRadius: radius.md,
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
@@ -469,10 +524,7 @@ const styles = StyleSheet.create({
   cardSub: { fontSize: fontSize.sm, color: colors.subtext },
   cardCapacity: { fontSize: fontSize.md, fontWeight: '700', color: colors.accent },
   cardCapacityUnit: { fontSize: fontSize.xs, color: colors.muted, fontWeight: '400' },
-  cardActions: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    paddingHorizontal: spacing.md, paddingBottom: spacing.md,
-  },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.md },
   actionIcon: {
     width: 36, height: 36, borderRadius: radius.md,
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
